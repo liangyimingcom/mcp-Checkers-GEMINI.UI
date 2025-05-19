@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.anycompany.demo.jumping.mapper.ActivityUserMapper">
+    
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.anycompany.demo.jumping.model.ActivityUser">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="activity_id" property="activityId" />
+        <result column="current_position" property="currentPosition" />
+        <result column="game_chances" property="gameChances" />
+        <result column="points" property="points" />
+        <result column="daily_plays" property="dailyPlays" />
+        <result column="last_play_time" property="lastPlayTime" />
+        <result column="unlocked_items" property="unlockedItems" />
+        <result column="redeemed_chests" property="redeemedChests" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="is_deleted" property="isDeleted" />
+    </resultMap>
+    
+    <!-- 公共列 -->
+    <sql id="Base_Column_List">
+        id, user_id, activity_id, current_position, game_chances, points, daily_plays, 
+        last_play_time, unlocked_items, redeemed_chests, create_time, update_time, is_deleted
+    </sql>
+    
+    <!-- 根据ID查询活动用户 -->
+    <select id="getById" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_activity_user
+        WHERE id = #{id} AND is_deleted = FALSE
+    </select>
+    
+    <!-- 根据用户ID和活动ID查询活动用户 -->
+    <select id="getByUserIdAndActivityId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_activity_user
+        WHERE user_id = #{userId} AND activity_id = #{activityId} AND is_deleted = FALSE
+        LIMIT 1
+    </select>
+    
+    <!-- 根据用户ID查询活动用户列表 -->
+    <select id="findByUserId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_activity_user
+        WHERE user_id = #{userId} AND is_deleted = FALSE
+        ORDER BY update_time DESC
+    </select>
+    
+    <!-- 根据活动ID查询活动用户列表 -->
+    <select id="findByActivityId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_activity_user
+        WHERE activity_id = #{activityId} AND is_deleted = FALSE
+        ORDER BY update_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <!-- 根据积分区间查询活动用户列表 -->
+    <select id="findByPointsRange" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_activity_user
+        WHERE activity_id = #{activityId} 
+        AND points BETWEEN #{minPoints} AND #{maxPoints} 
+        AND is_deleted = FALSE
+        ORDER BY points DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <!-- 根据积分排名查询活动用户列表（按积分降序排列） -->
+    <select id="findOrderByPointsDesc" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_activity_user
+        WHERE activity_id = #{activityId} AND is_deleted = FALSE
+        ORDER BY points DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <!-- 查询活动中当日游戏次数已达上限的用户 -->
+    <select id="findReachedDailyLimit" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_activity_user
+        WHERE activity_id = #{activityId} 
+        AND daily_plays >= #{dailyPlayLimit}
+        AND DATE(last_play_time) = DATE(#{today}) 
+        AND is_deleted = FALSE
+    </select>
+    
+    <!-- 插入活动用户 -->
+    <insert id="insert" parameterType="com.anycompany.demo.jumping.model.ActivityUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO demo_activity_user (
+            user_id, activity_id, current_position, game_chances, points, 
+            daily_plays, last_play_time, unlocked_items, redeemed_chests, 
+            create_time, update_time, is_deleted
+        ) VALUES (
+            #{userId}, #{activityId}, #{currentPosition}, #{gameChances}, #{points}, 
+            #{dailyPlays}, #{lastPlayTime}, #{unlockedItems}, #{redeemedChests}, 
+            NOW(), NOW(), FALSE
+        )
+    </insert>
+    
+    <!-- 更新活动用户 -->
+    <update id="update" parameterType="com.anycompany.demo.jumping.model.ActivityUser">
+        UPDATE demo_activity_user
+        <set>
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="activityId != null">activity_id = #{activityId},</if>
+            <if test="currentPosition != null">current_position = #{currentPosition},</if>
+            <if test="gameChances != null">game_chances = #{gameChances},</if>
+            <if test="points != null">points = #{points},</if>
+            <if test="dailyPlays != null">daily_plays = #{dailyPlays},</if>
+            <if test="lastPlayTime != null">last_play_time = #{lastPlayTime},</if>
+            <if test="unlockedItems != null">unlocked_items = #{unlockedItems},</if>
+            <if test="redeemedChests != null">redeemed_chests = #{redeemedChests},</if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 增加游戏机会 -->
+    <update id="increaseChances">
+        UPDATE demo_activity_user
+        SET game_chances = game_chances + #{chances},
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 减少游戏机会 -->
+    <update id="decreaseChances">
+        UPDATE demo_activity_user
+        SET game_chances = CASE WHEN game_chances >= #{chances} THEN game_chances - #{chances} ELSE 0 END,
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE AND game_chances >= #{chances}
+    </update>
+    
+    <!-- 增加积分 -->
+    <update id="increasePoints">
+        UPDATE demo_activity_user
+        SET points = points + #{points},
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 减少积分 -->
+    <update id="decreasePoints">
+        UPDATE demo_activity_user
+        SET points = CASE WHEN points >= #{points} THEN points - #{points} ELSE 0 END,
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE AND points >= #{points}
+    </update>
+    
+    <!-- 更新用户位置 -->
+    <update id="updatePosition">
+        UPDATE demo_activity_user
+        SET current_position = #{position},
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 记录游戏次数和更新最后游戏时间 -->
+    <update id="recordGamePlay">
+        UPDATE demo_activity_user
+        SET daily_plays = 
+            CASE 
+                WHEN DATE(last_play_time) = DATE(#{playTime}) THEN daily_plays + 1
+                ELSE 1
+            END,
+            last_play_time = #{playTime},
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 重置每日游戏次数 -->
+    <update id="resetDailyPlays">
+        UPDATE demo_activity_user
+        SET daily_plays = 0,
+            update_time = NOW()
+        WHERE activity_id = #{activityId} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 更新已解锁道具 -->
+    <update id="updateUnlockedItems">
+        UPDATE demo_activity_user
+        SET unlocked_items = #{unlockedItems},
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 更新已兑换宝箱 -->
+    <update id="updateRedeemedChests">
+        UPDATE demo_activity_user
+        SET redeemed_chests = #{redeemedChests},
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 删除活动用户（逻辑删除） -->
+    <update id="deleteById">
+        UPDATE demo_activity_user
+        SET is_deleted = TRUE,
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 批量删除活动用户（逻辑删除） -->
+    <update id="batchDelete">
+        UPDATE demo_activity_user
+        SET is_deleted = TRUE,
+            update_time = NOW()
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        AND is_deleted = FALSE
+    </update>
+</mapper>
