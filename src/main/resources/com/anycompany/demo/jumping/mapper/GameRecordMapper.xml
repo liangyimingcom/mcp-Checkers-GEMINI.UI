@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.anycompany.demo.jumping.mapper.GameRecordMapper">
+    
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.anycompany.demo.jumping.model.GameRecord">
+        <id column="id" property="id" />
+        <result column="user_id" property="userId" />
+        <result column="activity_id" property="activityId" />
+        <result column="chances_used" property="chancesUsed" />
+        <result column="dice_results" property="diceResults" />
+        <result column="start_position" property="startPosition" />
+        <result column="end_position" property="endPosition" />
+        <result column="points_gained" property="pointsGained" />
+        <result column="rewards_gained" property="rewardsGained" />
+        <result column="request_id" property="requestId" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="is_deleted" property="isDeleted" />
+    </resultMap>
+    
+    <!-- 公共列 -->
+    <sql id="Base_Column_List">
+        id, user_id, activity_id, chances_used, dice_results, start_position, end_position, 
+        points_gained, rewards_gained, request_id, create_time, update_time, is_deleted
+    </sql>
+    
+    <!-- 根据ID查询游戏记录 -->
+    <select id="getById" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_game_record
+        WHERE id = #{id} AND is_deleted = FALSE
+    </select>
+    
+    <!-- 根据请求ID查询游戏记录（幂等性检查） -->
+    <select id="getByRequestId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_game_record
+        WHERE request_id = #{requestId} AND is_deleted = FALSE
+        LIMIT 1
+    </select>
+    
+    <!-- 根据用户ID和活动ID查询游戏记录列表 -->
+    <select id="findByUserAndActivity" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_game_record
+        WHERE user_id = #{userId} AND activity_id = #{activityId} AND is_deleted = FALSE
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <!-- 根据用户ID查询游戏记录列表 -->
+    <select id="findByUserId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_game_record
+        WHERE user_id = #{userId} AND is_deleted = FALSE
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <!-- 根据活动ID查询游戏记录列表 -->
+    <select id="findByActivityId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_game_record
+        WHERE activity_id = #{activityId} AND is_deleted = FALSE
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <!-- 查询用户某个时间段内的游戏记录 -->
+    <select id="findByTimeRange" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM demo_game_record
+        WHERE user_id = #{userId} 
+        <if test="activityId != null">
+            AND activity_id = #{activityId}
+        </if>
+        AND create_time &gt;= #{startTime} AND create_time &lt;= #{endTime}
+        AND is_deleted = FALSE
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+    
+    <!-- 计算用户某个时间段内获得的总积分 -->
+    <select id="sumPointsByTimeRange" resultType="java.lang.Integer">
+        SELECT COALESCE(SUM(points_gained), 0)
+        FROM demo_game_record
+        WHERE user_id = #{userId} 
+        <if test="activityId != null">
+            AND activity_id = #{activityId}
+        </if>
+        AND create_time BETWEEN #{startTime} AND #{endTime}
+        AND is_deleted = FALSE
+    </select>
+    
+    <!-- 统计用户某个时间段内的游戏次数 -->
+    <select id="countByTimeRange" resultType="java.lang.Integer">
+        SELECT COUNT(id)
+        FROM demo_game_record
+        WHERE user_id = #{userId} 
+        <if test="activityId != null">
+            AND activity_id = #{activityId}
+        </if>
+        AND create_time BETWEEN #{startTime} AND #{endTime}
+        AND is_deleted = FALSE
+    </select>
+    
+    <!-- 插入游戏记录 -->
+    <insert id="insert" parameterType="com.anycompany.demo.jumping.model.GameRecord" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO demo_game_record (
+            user_id, activity_id, chances_used, dice_results, start_position, 
+            end_position, points_gained, rewards_gained, request_id, 
+            create_time, update_time, is_deleted
+        ) VALUES (
+            #{userId}, #{activityId}, #{chancesUsed}, #{diceResults}, #{startPosition}, 
+            #{endPosition}, #{pointsGained}, #{rewardsGained}, #{requestId}, 
+            NOW(), NOW(), FALSE
+        )
+    </insert>
+    
+    <!-- 更新游戏记录 -->
+    <update id="update" parameterType="com.anycompany.demo.jumping.model.GameRecord">
+        UPDATE demo_game_record
+        <set>
+            <if test="userId != null">user_id = #{userId},</if>
+            <if test="activityId != null">activity_id = #{activityId},</if>
+            <if test="chancesUsed != null">chances_used = #{chancesUsed},</if>
+            <if test="diceResults != null">dice_results = #{diceResults},</if>
+            <if test="startPosition != null">start_position = #{startPosition},</if>
+            <if test="endPosition != null">end_position = #{endPosition},</if>
+            <if test="pointsGained != null">points_gained = #{pointsGained},</if>
+            <if test="rewardsGained != null">rewards_gained = #{rewardsGained},</if>
+            <if test="requestId != null">request_id = #{requestId},</if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 更新游戏记录获得的积分 -->
+    <update id="updatePointsGained">
+        UPDATE demo_game_record
+        SET points_gained = #{pointsGained},
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 更新游戏记录获得的奖励 -->
+    <update id="updateRewardsGained">
+        UPDATE demo_game_record
+        SET rewards_gained = #{rewardsGained},
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 删除游戏记录（逻辑删除） -->
+    <update id="deleteById">
+        UPDATE demo_game_record
+        SET is_deleted = TRUE,
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+    
+    <!-- 批量删除游戏记录（逻辑删除） -->
+    <update id="batchDelete">
+        UPDATE demo_game_record
+        SET is_deleted = TRUE,
+            update_time = NOW()
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        AND is_deleted = FALSE
+    </update>
+    
+    <!-- 物理删除指定日期之前的游戏记录（用于归档清理） -->
+    <delete id="purgeRecordsBeforeDate">
+        DELETE FROM demo_game_record
+        WHERE activity_id = #{activityId}
+        AND create_time &lt; #{beforeDate}
+        AND is_deleted = TRUE
+    </delete>
+</mapper>
